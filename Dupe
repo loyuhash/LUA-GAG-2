@@ -1,266 +1,369 @@
--- Evenesce Farm | FIXED for Delta + GitHub
--- Paste this in GitHub as main.lua
-
--- FIX 1: Delta-safe UI parent
-local function GetUIParent()
-    local success, hui = pcall(function() return gethui() end)
-    if success and hui then return hui end
-    local success2, core = pcall(function() return game:GetService("CoreGui") end)
-    if success2 then return core end
-    return game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-end
-
--- Remove old UI if exists
-pcall(function()
-    GetUIParent():FindFirstChild("EvenesceFarm"):Destroy()
-end)
-
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
-getgenv().EvenesceConfig = getgenv().EvenesceConfig or {
-    AutoFarm = false,
-    AutoSummon = false,
-    AutoEvolve = false,
-    AutoUpgrade = true,
-    AutoStart = true,
-}
+local localPlayer = Players.LocalPlayer
 
-print("[Evenesce] Loading UI...")
+pcall(function()
+    local hui = gethui and gethui() or CoreGui
+    for _, name in ipairs({ "UniqueLuckActiveUI", "TraitResultOverlay" }) do
+        local old = hui:FindFirstChild(name)
+        if old then old:Destroy() end
+    end
+end)
 
--- ===== UI =====
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "EvenesceFarm"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = GetUIParent()
+local hui = gethui and gethui() or CoreGui
 
-local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 620, 0, 380)
-Main.Position = UDim2.new(0.5, -310, 0.5, -190)
-Main.BackgroundColor3 = Color3.fromRGB(13, 13, 18)
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Parent = ScreenGui
-local c = Instance.new("UICorner", Main); c.CornerRadius = UDim.new(0, 12)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- SHARED: animated rainbow stroke helper
+-- ═══════════════════════════════════════════════════════════════════════════════
 
-local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 40)
-TopBar.BackgroundTransparency = 1
-TopBar.Parent = Main
-
-local Logo = Instance.new("TextLabel")
-Logo.Text = "Xena Menu✅"
-Logo.Font = Enum.Font.GothamBold
-Logo.TextSize = 16
-Logo.TextColor3 = Color3.fromRGB(140, 130, 255)
-Logo.BackgroundTransparency = 1
-Logo.Size = UDim2.new(0, 200, 1, 0)
-Logo.TextXAlignment = Enum.TextXAlignment.Left
-Logo.Parent = TopBar
-
--- Close button (Delta needs this)
-local Close = Instance.new("TextButton")
-Close.Text = "X"
-Close.Size = UDim2.new(0, 30, 0, 30)
-Close.Position = UDim2.new(1, -35, 0, 5)
-Close.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-Close.TextColor3 = Color3.fromRGB(255,255,255)
-Close.Font = Enum.Font.GothamBold
-Close.Parent = TopBar
-Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 6)
-Close.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
-
--- Minimize / Show button
-local ShowBtn = Instance.new("TextButton")
-ShowBtn.Text = "Evenesce"
-ShowBtn.Size = UDim2.new(0, 90, 0, 30)
-ShowBtn.Position = UDim2.new(0, 10, 0, 10)
-ShowBtn.Visible = false
-ShowBtn.BackgroundColor3 = Color3.fromRGB(140,130,255)
-ShowBtn.TextColor3 = Color3.fromRGB(255,255,255)
-ShowBtn.Parent = GetUIParent()
-Instance.new("UICorner", ShowBtn).CornerRadius = UDim.new(0, 6)
-
--- Sidebar
-local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 130, 1, -50)
-Sidebar.Position = UDim2.new(0, 0, 0, 50)
-Sidebar.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
-Sidebar.BorderSizePixel = 0
-Sidebar.Parent = Main
-
-local function SideBtn(name, y, active)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 32)
-    btn.Position = UDim2.new(0, 5, 0, y)
-    btn.Text = "  "..name
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 13
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.BackgroundColor3 = active and Color3.fromRGB(28,28,40) or Color3.fromRGB(16,16,22)
-    btn.TextColor3 = active and Color3.fromRGB(255,255,255) or Color3.fromRGB(150,150,170)
-    btn.Parent = Sidebar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    return btn
-end
-SideBtn("◉  Farm", 10, true)
-SideBtn("✦  Summon", 48, false)
-SideBtn("⬆  Evolve", 86, false)
-SideBtn("👤  Player", 124, false)
-SideBtn("⚙  Misc", 162, false)
-
--- Helper: Section
-local function MakeSection(title, posX, posY, sizeX, sizeY)
-    local f = Instance.new("Frame")
-    f.Size = UDim2.new(0, sizeX, 0, sizeY)
-    f.Position = UDim2.new(0, posX, 0, posY)
-    f.BackgroundColor3 = Color3.fromRGB(19, 19, 26)
-    f.BorderSizePixel = 0
-    f.Parent = Main
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
-    local t = Instance.new("TextLabel")
-    t.Text = title
-    t.Font = Enum.Font.GothamBold
-    t.TextSize = 13
-    t.TextColor3 = Color3.fromRGB(200,200,220)
-    t.BackgroundTransparency = 1
-    t.Position = UDim2.new(0, 10, 0, 6)
-    t.Size = UDim2.new(1, -10, 0, 20)
-    t.TextXAlignment = Enum.TextXAlignment.Left
-    t.Parent = f
-    return f
-end
-
-local function MakeToggle(parent, text, y, default, callback)
-    local label = Instance.new("TextLabel")
-    label.Text = text
-    label.Font = Enum.Font.GothamMedium
-    label.TextSize = 12
-    label.TextColor3 = Color3.fromRGB(180,180,200)
-    label.BackgroundTransparency = 1
-    label.Position = UDim2.new(0, 10, 0, y)
-    label.Size = UDim2.new(0, 150, 0, 20)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = parent
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, 34, 0, 18)
-    toggle.Position = UDim2.new(1, -44, 0, y+1)
-    toggle.Text = ""
-    toggle.BackgroundColor3 = default and Color3.fromRGB(140,130,255) or Color3.fromRGB(60,60,75)
-    toggle.Parent = parent
-    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 9)
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.Position = default and UDim2.new(1, -16, 0, 2) or UDim2.new(0, 2, 0, 2)
-    knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    knob.BorderSizePixel = 0
-    knob.Parent = toggle
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 7)
-    local state = default
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.BackgroundColor3 = state and Color3.fromRGB(140,130,255) or Color3.fromRGB(60,60,75)
-        knob.Position = state and UDim2.new(1, -16, 0, 2) or UDim2.new(0, 2, 0, 2)
-        pcall(callback, state)
+local function rainbowStroke(stroke, speed)
+    speed = speed or 0.004
+    task.spawn(function()
+        local hue = 0
+        while stroke.Parent do
+            hue = (hue + speed) % 1
+            stroke.Color = Color3.fromHSV(hue, 1, 1)
+            task.wait()
+        end
     end)
-    return toggle
 end
 
--- Status Label - so you know if it's working
-local Status = Instance.new("TextLabel")
-Status.Text = "Status: Ready ✅"
-Status.Font = Enum.Font.GothamMedium
-Status.TextSize = 12
-Status.TextColor3 = Color3.fromRGB(0,255,120)
-Status.BackgroundTransparency = 1
-Status.Position = UDim2.new(0, 145, 0, 345)
-Status.Size = UDim2.new(0, 300, 0, 20)
-Status.TextXAlignment = Enum.TextXAlignment.Left
-Status.Parent = Main
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- PART 1 — PILL + TOGGLE CARD
+-- ═══════════════════════════════════════════════════════════════════════════════
 
--- Sections
-local FarmSection = MakeSection("Auto Farm", 145, 60, 220, 140)
-MakeToggle(FarmSection, "Enable auto farm", 30, false, function(v)
-    getgenv().EvenesceConfig.AutoFarm = v
-    Status.Text = v and "Status: Farming... 🌾" or "Status: Paused"
-    print("[Evenesce] AutoFarm:", v)
-end)
-MakeToggle(FarmSection, "Auto Upgrade", 60, true, function(v)
-    getgenv().EvenesceConfig.AutoUpgrade = v
-end)
-MakeToggle(FarmSection, "Auto Start / Replay", 90, true, function(v)
-    getgenv().EvenesceConfig.AutoStart = v
+local sg = Instance.new("ScreenGui")
+sg.Name = "UniqueLuckActiveUI"
+sg.ResetOnSpawn = false
+sg.IgnoreGuiInset = true
+sg.DisplayOrder = 999997
+sg.Parent = hui
+
+-- ─── TOP PILL ─────────────────────────────────────────────────────────────────
+local pill = Instance.new("Frame")
+pill.AnchorPoint = Vector2.new(0.5, 0)
+pill.Position = UDim2.new(0.5, 0, 0, 20)
+pill.Size = UDim2.fromOffset(272, 44)
+pill.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+pill.BorderSizePixel = 0
+pill.Parent = sg
+Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+
+local pillStroke = Instance.new("UIStroke", pill)
+pillStroke.Thickness = 2.8
+pillStroke.Transparency = 0
+rainbowStroke(pillStroke, 0.004)
+
+local pillGrad = Instance.new("UIGradient", pill)
+pillGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(28, 14, 46)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14, 10, 28)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(28, 14, 46)),
+})
+pillGrad.Rotation = 90
+
+local pillLabel = Instance.new("TextLabel")
+pillLabel.Size = UDim2.fromScale(1, 1)
+pillLabel.BackgroundTransparency = 1
+pillLabel.Font = Enum.Font.GothamBold
+pillLabel.TextSize = 15
+pillLabel.RichText = true
+pillLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+-- FIXED: Replaced ✤ with ★ and removed the emoji to prevent missing fonts
+pillLabel.Text = '<font color="#c8853a">★  Unique Luck Active  ★</font>'
+pillLabel.Parent = pill
+
+-- ─── TOGGLE CARD ──────────────────────────────────────────────────────────────
+local card = Instance.new("Frame")
+card.Name = "ToggleCard"
+card.AnchorPoint = Vector2.new(0, 1)
+card.Position = UDim2.new(0, 10, 1, -10)
+card.Size = UDim2.fromOffset(195, 62)
+card.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+card.BorderSizePixel = 0
+card.Parent = sg
+Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
+
+local cardStroke = Instance.new("UIStroke", card)
+cardStroke.Thickness = 2.4
+cardStroke.Transparency = 0
+rainbowStroke(cardStroke, 0.004)
+
+local cardGrad = Instance.new("UIGradient", card)
+cardGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(22, 14, 40)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 10, 24)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(22, 14, 40)),
+})
+cardGrad.Rotation = 135
+
+-- green dot
+local dot = Instance.new("Frame")
+dot.Size = UDim2.fromOffset(10, 10)
+dot.Position = UDim2.new(0, 10, 0, 14)
+dot.BackgroundColor3 = Color3.fromRGB(0, 220, 80)
+dot.BorderSizePixel = 0
+dot.Parent = card
+Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+TweenService:Create(dot,
+    TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+    { BackgroundColor3 = Color3.fromRGB(0, 255, 110) }
+):Play()
+
+-- UNIQUE label
+local uniqueLabel = Instance.new("TextLabel")
+uniqueLabel.Position = UDim2.new(0, 26, 0, 6)
+uniqueLabel.Size = UDim2.new(1, -90, 0, 24)
+uniqueLabel.BackgroundTransparency = 1
+uniqueLabel.Font = Enum.Font.GothamBold
+uniqueLabel.TextSize = 16
+uniqueLabel.TextXAlignment = Enum.TextXAlignment.Left
+uniqueLabel.TextColor3 = Color3.fromRGB(80, 220, 255)
+-- FIXED: Removed 💎
+uniqueLabel.Text = "UNIQUE"
+uniqueLabel.Parent = card
+
+-- shimmer sweep
+local uniqueGrad = Instance.new("UIGradient", uniqueLabel)
+uniqueGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,    Color3.fromRGB(80,  200, 255)),
+    ColorSequenceKeypoint.new(0.4,  Color3.fromRGB(200, 255, 255)),
+    ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.7,  Color3.fromRGB(200, 255, 255)),
+    ColorSequenceKeypoint.new(1,    Color3.fromRGB(80,  200, 255)),
+})
+uniqueGrad.Rotation = 0
+
+task.spawn(function()
+    while uniqueLabel.Parent do
+        TweenService:Create(uniqueGrad,
+            TweenInfo.new(1.6, Enum.EasingStyle.Linear),
+            { Offset = Vector2.new(1, 0) }
+        ):Play()
+        task.wait(1.6)
+        uniqueGrad.Offset = Vector2.new(-1, 0)
+    end
 end)
 
-local SummonSection = MakeSection("Auto Summon", 380, 60, 220, 140)
-MakeToggle(SummonSection, "Enable auto summon", 30, false, function(v)
-    getgenv().EvenesceConfig.AutoSummon = v
-    print("[Evenesce] AutoSummon:", v)
+-- sub label
+local subLabel = Instance.new("TextLabel")
+subLabel.Position = UDim2.new(0, 10, 0, 36)
+subLabel.Size = UDim2.new(1, -20, 0, 18)
+subLabel.BackgroundTransparency = 1
+subLabel.Font = Enum.Font.Gotham
+subLabel.TextSize = 11
+subLabel.TextXAlignment = Enum.TextXAlignment.Left
+subLabel.TextColor3 = Color3.fromRGB(150, 145, 165)
+-- FIXED: Replaced 🍀 with ♣
+subLabel.Text = "Unique Luck Active ♣"
+subLabel.Parent = card
+
+-- ─── TOGGLE ───────────────────────────────────────────────────────────────────
+local toggleTrack = Instance.new("Frame")
+toggleTrack.AnchorPoint = Vector2.new(1, 0.5)
+toggleTrack.Position = UDim2.new(1, -10, 0, 24)
+toggleTrack.Size = UDim2.fromOffset(48, 25)
+toggleTrack.BackgroundColor3 = Color3.fromRGB(0, 190, 80)
+toggleTrack.BorderSizePixel = 0
+toggleTrack.Parent = card
+Instance.new("UICorner", toggleTrack).CornerRadius = UDim.new(1, 0)
+
+local onLabel = Instance.new("TextLabel")
+onLabel.AnchorPoint = Vector2.new(0, 0.5)
+onLabel.Position = UDim2.new(0, 5, 0.5, 0)
+onLabel.Size = UDim2.fromOffset(22, 25)
+onLabel.BackgroundTransparency = 1
+onLabel.Font = Enum.Font.GothamBold
+onLabel.TextSize = 10
+onLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+onLabel.Text = "On"
+onLabel.Parent = toggleTrack
+
+local knob = Instance.new("Frame")
+knob.AnchorPoint = Vector2.new(0, 0.5)
+knob.Position = UDim2.new(0, 25, 0.5, 0)
+knob.Size = UDim2.fromOffset(21, 21)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.BorderSizePixel = 0
+knob.Parent = toggleTrack
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+local isOn = true
+
+local function setToggle(state)
+    isOn = state
+    local t = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    TweenService:Create(knob, t, {
+        Position = state
+            and UDim2.new(0, 25, 0.5, 0)
+            or  UDim2.new(0, 2,  0.5, 0)
+    }):Play()
+    TweenService:Create(toggleTrack, t, {
+        BackgroundColor3 = state
+            and Color3.fromRGB(0, 190, 80)
+            or  Color3.fromRGB(65, 65, 80)
+    }):Play()
+    onLabel.Text = state and "On" or "Off"
+    dot.BackgroundColor3 = state
+        and Color3.fromRGB(0, 220, 80)
+        or  Color3.fromRGB(90, 90, 105)
+    uniqueLabel.TextColor3 = state
+        and Color3.fromRGB(80, 220, 255)
+        or  Color3.fromRGB(100, 100, 115)
+end
+
+toggleTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        setToggle(not isOn)
+    end
 end)
 
-local EvolveSection = MakeSection("Auto Evolve + Misc", 145, 210, 455, 120)
-MakeToggle(EvolveSection, "Enable auto evolve", 30, false, function(v)
-    getgenv().EvenesceConfig.AutoEvolve = v
-    print("[Evenesce] AutoEvolve:", v)
-end)
-MakeToggle(EvolveSection, "Anti-AFK", 60, true, function(v) end)
+-- ─── DRAG ─────────────────────────────────────────────────────────────────────
+local dragging, dragStart, startPos = false, nil, nil
 
--- ===== DRAG (Fixed for Delta Mobile/PC) =====
-local dragging, dragStart, startPos
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+card.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
-        startPos = Main.Position
+        startPos = card.Position
     end
 end)
-UIS.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragging then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch then
         local delta = input.Position - dragStart
-        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        card.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
     end
 end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
     end
 end)
 
--- ===== LOGIC - Safe, won't crash if remotes missing =====
-task.spawn(function()
-    local VirtualUser = game:GetService("VirtualUser")
-    LocalPlayer.Idled:Connect(function()
-        pcall(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.new())
-        end)
-    end)
-end)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- PART 2 — REROLL RESULT FLASH
+-- ═══════════════════════════════════════════════════════════════════════════════
 
--- Auto Farm Loop - This is where it actually farms
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if getgenv().EvenesceConfig.AutoFarm then
-            -- Try to find remotes safely, don't error if not found
-            local success = pcall(function()
-                local RS = game:GetService("ReplicatedStorage")
-                -- Auto Start / Vote
-                for _, name in ipairs({"StartGame", "VoteStart", "Replay", "Start"}) do
-                    local r = RS:FindFirstChild(name, true)
-                    if r and r:IsA("RemoteEvent") then r:FireServer() end
-                    if r and r:IsA("RemoteFunction") then r:InvokeServer() end
-                end
-            end)
-            if not success then
-                Status.Text = "Status: Looking for game..."
+local function showResult()
+    if not isOn then return end
+
+    pcall(function()
+        local old = hui:FindFirstChild("TraitResultOverlay")
+        if old then old:Destroy() end
+    end)
+
+    local rsg = Instance.new("ScreenGui")
+    rsg.Name = "TraitResultOverlay"
+    rsg.ResetOnSpawn = false
+    rsg.IgnoreGuiInset = true
+    rsg.DisplayOrder = 999999
+    rsg.Parent = hui
+
+    local label = Instance.new("TextLabel")
+    label.AnchorPoint = Vector2.new(0, 0.5)
+    label.Position = UDim2.new(0.08, 0, 0.48, 0)
+    label.Size = UDim2.fromOffset(340, 70)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 54
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    -- FIXED: Removed 💎 and ✨
+    label.Text = "Unique"
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextTransparency = 1
+    label.Parent = rsg
+
+    local grad = Instance.new("UIGradient", label)
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,    Color3.fromRGB(148, 50,  180)),
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(180, 60,  120)),
+        ColorSequenceKeypoint.new(1,    Color3.fromRGB(210, 100, 30)),
+    })
+    grad.Rotation = 0
+
+    task.spawn(function()
+        while label.Parent and label.TextTransparency < 1 do
+            TweenService:Create(grad,
+                TweenInfo.new(0.9, Enum.EasingStyle.Linear),
+                { Offset = Vector2.new(0.6, 0) }
+            ):Play()
+            task.wait(0.9)
+            grad.Offset = Vector2.new(-0.6, 0)
+        end
+    end)
+
+    TweenService:Create(label,
+        TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { TextTransparency = 0 }
+    ):Play()
+
+    TweenService:Create(label,
+        TweenInfo.new(2.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Position = UDim2.new(0.08, 0, 0.44, 0) }
+    ):Play()
+
+    task.delay(2, function()
+        if not rsg.Parent then return end
+        TweenService:Create(label,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { TextTransparency = 1 }
+        ):Play()
+        task.wait(0.35)
+        pcall(function() rsg:Destroy() end)
+    end)
+end
+
+-- ─── HOOK REROLL BUTTONS ──────────────────────────────────────────────────────
+local hooked = {}
+
+local function hookButtons()
+    local roots = { CoreGui, localPlayer:FindFirstChild("PlayerGui") }
+    for _, root in ipairs(roots) do
+        if not root then continue end
+        for _, desc in ipairs(root:GetDescendants()) do
+            if desc:IsA("TextButton")
+                and not hooked[desc]
+                and (
+                    desc.Text == "Reroll"
+                    or desc.Text == "Reroll Token"
+                    or desc.Text == "Robux Reroll"
+                )
+            then
+                hooked[desc] = true
+                desc.MouseButton1Click:Connect(function()
+                    task.delay(0.08, showResult)
+                end)
+                desc.TouchTap:Connect(function()
+                    task.delay(0.08, showResult)
+                end)
             end
         end
     end
+end
+
+task.spawn(function()
+    while sg.Parent do
+        task.wait(0.5)
+        pcall(hookButtons)
+    end
 end)
 
-print("[Evenesce] LOADED SUCCESSFULLY ✅")
+_G.UniqueLuckOn = function() return isOn end
+_G.ShowUnique   = showResult
+
+-- FIXED: Removed emojis from the print statement to prevent console errors on older executors
+print("[UniqueLuck] loaded")
