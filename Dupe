@@ -1,1 +1,369 @@
-loadstring(game:HttpGet("https://pastefy.app/ZNck1WFw/raw"))()
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+local localPlayer = Players.LocalPlayer
+
+pcall(function()
+    local hui = gethui and gethui() or CoreGui
+    for _, name in ipairs({ "UniqueLuckActiveUI", "TraitResultOverlay" }) do
+        local old = hui:FindFirstChild(name)
+        if old then old:Destroy() end
+    end
+end)
+
+local hui = gethui and gethui() or CoreGui
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- SHARED: animated rainbow stroke helper
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+local function rainbowStroke(stroke, speed)
+    speed = speed or 0.004
+    task.spawn(function()
+        local hue = 0
+        while stroke.Parent do
+            hue = (hue + speed) % 1
+            stroke.Color = Color3.fromHSV(hue, 1, 1)
+            task.wait()
+        end
+    end)
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- PART 1 — PILL + TOGGLE CARD
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "UniqueLuckActiveUI"
+sg.ResetOnSpawn = false
+sg.IgnoreGuiInset = true
+sg.DisplayOrder = 999997
+sg.Parent = hui
+
+-- ─── TOP PILL ─────────────────────────────────────────────────────────────────
+local pill = Instance.new("Frame")
+pill.AnchorPoint = Vector2.new(0.5, 0)
+pill.Position = UDim2.new(0.5, 0, 0, 20)
+pill.Size = UDim2.fromOffset(272, 44)
+pill.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+pill.BorderSizePixel = 0
+pill.Parent = sg
+Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+
+local pillStroke = Instance.new("UIStroke", pill)
+pillStroke.Thickness = 2.8
+pillStroke.Transparency = 0
+rainbowStroke(pillStroke, 0.004)
+
+local pillGrad = Instance.new("UIGradient", pill)
+pillGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(28, 14, 46)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14, 10, 28)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(28, 14, 46)),
+})
+pillGrad.Rotation = 90
+
+local pillLabel = Instance.new("TextLabel")
+pillLabel.Size = UDim2.fromScale(1, 1)
+pillLabel.BackgroundTransparency = 1
+pillLabel.Font = Enum.Font.GothamBold
+pillLabel.TextSize = 15
+pillLabel.RichText = true
+pillLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+-- FIXED: Replaced ✤ with ★ and removed the emoji to prevent missing fonts
+pillLabel.Text = '<font color="#c8853a">★  Unique Luck Active  ★</font>'
+pillLabel.Parent = pill
+
+-- ─── TOGGLE CARD ──────────────────────────────────────────────────────────────
+local card = Instance.new("Frame")
+card.Name = "ToggleCard"
+card.AnchorPoint = Vector2.new(0, 1)
+card.Position = UDim2.new(0, 10, 1, -10)
+card.Size = UDim2.fromOffset(195, 62)
+card.BackgroundColor3 = Color3.fromRGB(10, 8, 18)
+card.BorderSizePixel = 0
+card.Parent = sg
+Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
+
+local cardStroke = Instance.new("UIStroke", card)
+cardStroke.Thickness = 2.4
+cardStroke.Transparency = 0
+rainbowStroke(cardStroke, 0.004)
+
+local cardGrad = Instance.new("UIGradient", card)
+cardGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(22, 14, 40)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 10, 24)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(22, 14, 40)),
+})
+cardGrad.Rotation = 135
+
+-- green dot
+local dot = Instance.new("Frame")
+dot.Size = UDim2.fromOffset(10, 10)
+dot.Position = UDim2.new(0, 10, 0, 14)
+dot.BackgroundColor3 = Color3.fromRGB(0, 220, 80)
+dot.BorderSizePixel = 0
+dot.Parent = card
+Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+TweenService:Create(dot,
+    TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+    { BackgroundColor3 = Color3.fromRGB(0, 255, 110) }
+):Play()
+
+-- UNIQUE label
+local uniqueLabel = Instance.new("TextLabel")
+uniqueLabel.Position = UDim2.new(0, 26, 0, 6)
+uniqueLabel.Size = UDim2.new(1, -90, 0, 24)
+uniqueLabel.BackgroundTransparency = 1
+uniqueLabel.Font = Enum.Font.GothamBold
+uniqueLabel.TextSize = 16
+uniqueLabel.TextXAlignment = Enum.TextXAlignment.Left
+uniqueLabel.TextColor3 = Color3.fromRGB(80, 220, 255)
+-- FIXED: Removed 💎
+uniqueLabel.Text = "UNIQUE"
+uniqueLabel.Parent = card
+
+-- shimmer sweep
+local uniqueGrad = Instance.new("UIGradient", uniqueLabel)
+uniqueGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,    Color3.fromRGB(80,  200, 255)),
+    ColorSequenceKeypoint.new(0.4,  Color3.fromRGB(200, 255, 255)),
+    ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.7,  Color3.fromRGB(200, 255, 255)),
+    ColorSequenceKeypoint.new(1,    Color3.fromRGB(80,  200, 255)),
+})
+uniqueGrad.Rotation = 0
+
+task.spawn(function()
+    while uniqueLabel.Parent do
+        TweenService:Create(uniqueGrad,
+            TweenInfo.new(1.6, Enum.EasingStyle.Linear),
+            { Offset = Vector2.new(1, 0) }
+        ):Play()
+        task.wait(1.6)
+        uniqueGrad.Offset = Vector2.new(-1, 0)
+    end
+end)
+
+-- sub label
+local subLabel = Instance.new("TextLabel")
+subLabel.Position = UDim2.new(0, 10, 0, 36)
+subLabel.Size = UDim2.new(1, -20, 0, 18)
+subLabel.BackgroundTransparency = 1
+subLabel.Font = Enum.Font.Gotham
+subLabel.TextSize = 11
+subLabel.TextXAlignment = Enum.TextXAlignment.Left
+subLabel.TextColor3 = Color3.fromRGB(150, 145, 165)
+-- FIXED: Replaced 🍀 with ♣
+subLabel.Text = "Unique Luck Active ♣"
+subLabel.Parent = card
+
+-- ─── TOGGLE ───────────────────────────────────────────────────────────────────
+local toggleTrack = Instance.new("Frame")
+toggleTrack.AnchorPoint = Vector2.new(1, 0.5)
+toggleTrack.Position = UDim2.new(1, -10, 0, 24)
+toggleTrack.Size = UDim2.fromOffset(48, 25)
+toggleTrack.BackgroundColor3 = Color3.fromRGB(0, 190, 80)
+toggleTrack.BorderSizePixel = 0
+toggleTrack.Parent = card
+Instance.new("UICorner", toggleTrack).CornerRadius = UDim.new(1, 0)
+
+local onLabel = Instance.new("TextLabel")
+onLabel.AnchorPoint = Vector2.new(0, 0.5)
+onLabel.Position = UDim2.new(0, 5, 0.5, 0)
+onLabel.Size = UDim2.fromOffset(22, 25)
+onLabel.BackgroundTransparency = 1
+onLabel.Font = Enum.Font.GothamBold
+onLabel.TextSize = 10
+onLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+onLabel.Text = "On"
+onLabel.Parent = toggleTrack
+
+local knob = Instance.new("Frame")
+knob.AnchorPoint = Vector2.new(0, 0.5)
+knob.Position = UDim2.new(0, 25, 0.5, 0)
+knob.Size = UDim2.fromOffset(21, 21)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.BorderSizePixel = 0
+knob.Parent = toggleTrack
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+local isOn = true
+
+local function setToggle(state)
+    isOn = state
+    local t = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    TweenService:Create(knob, t, {
+        Position = state
+            and UDim2.new(0, 25, 0.5, 0)
+            or  UDim2.new(0, 2,  0.5, 0)
+    }):Play()
+    TweenService:Create(toggleTrack, t, {
+        BackgroundColor3 = state
+            and Color3.fromRGB(0, 190, 80)
+            or  Color3.fromRGB(65, 65, 80)
+    }):Play()
+    onLabel.Text = state and "On" or "Off"
+    dot.BackgroundColor3 = state
+        and Color3.fromRGB(0, 220, 80)
+        or  Color3.fromRGB(90, 90, 105)
+    uniqueLabel.TextColor3 = state
+        and Color3.fromRGB(80, 220, 255)
+        or  Color3.fromRGB(100, 100, 115)
+end
+
+toggleTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        setToggle(not isOn)
+    end
+end)
+
+-- ─── DRAG ─────────────────────────────────────────────────────────────────────
+local dragging, dragStart, startPos = false, nil, nil
+
+card.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = card.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragging then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - dragStart
+        card.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- PART 2 — REROLL RESULT FLASH
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+local function showResult()
+    if not isOn then return end
+
+    pcall(function()
+        local old = hui:FindFirstChild("TraitResultOverlay")
+        if old then old:Destroy() end
+    end)
+
+    local rsg = Instance.new("ScreenGui")
+    rsg.Name = "TraitResultOverlay"
+    rsg.ResetOnSpawn = false
+    rsg.IgnoreGuiInset = true
+    rsg.DisplayOrder = 999999
+    rsg.Parent = hui
+
+    local label = Instance.new("TextLabel")
+    label.AnchorPoint = Vector2.new(0, 0.5)
+    label.Position = UDim2.new(0.08, 0, 0.48, 0)
+    label.Size = UDim2.fromOffset(340, 70)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 54
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    -- FIXED: Removed 💎 and ✨
+    label.Text = "Unique"
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextTransparency = 1
+    label.Parent = rsg
+
+    local grad = Instance.new("UIGradient", label)
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,    Color3.fromRGB(148, 50,  180)),
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(180, 60,  120)),
+        ColorSequenceKeypoint.new(1,    Color3.fromRGB(210, 100, 30)),
+    })
+    grad.Rotation = 0
+
+    task.spawn(function()
+        while label.Parent and label.TextTransparency < 1 do
+            TweenService:Create(grad,
+                TweenInfo.new(0.9, Enum.EasingStyle.Linear),
+                { Offset = Vector2.new(0.6, 0) }
+            ):Play()
+            task.wait(0.9)
+            grad.Offset = Vector2.new(-0.6, 0)
+        end
+    end)
+
+    TweenService:Create(label,
+        TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { TextTransparency = 0 }
+    ):Play()
+
+    TweenService:Create(label,
+        TweenInfo.new(2.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Position = UDim2.new(0.08, 0, 0.44, 0) }
+    ):Play()
+
+    task.delay(2, function()
+        if not rsg.Parent then return end
+        TweenService:Create(label,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { TextTransparency = 1 }
+        ):Play()
+        task.wait(0.35)
+        pcall(function() rsg:Destroy() end)
+    end)
+end
+
+-- ─── HOOK REROLL BUTTONS ──────────────────────────────────────────────────────
+local hooked = {}
+
+local function hookButtons()
+    local roots = { CoreGui, localPlayer:FindFirstChild("PlayerGui") }
+    for _, root in ipairs(roots) do
+        if not root then continue end
+        for _, desc in ipairs(root:GetDescendants()) do
+            if desc:IsA("TextButton")
+                and not hooked[desc]
+                and (
+                    desc.Text == "Reroll"
+                    or desc.Text == "Reroll Token"
+                    or desc.Text == "Robux Reroll"
+                )
+            then
+                hooked[desc] = true
+                desc.MouseButton1Click:Connect(function()
+                    task.delay(0.08, showResult)
+                end)
+                desc.TouchTap:Connect(function()
+                    task.delay(0.08, showResult)
+                end)
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while sg.Parent do
+        task.wait(0.5)
+        pcall(hookButtons)
+    end
+end)
+
+_G.UniqueLuckOn = function() return isOn end
+_G.ShowUnique   = showResult
+
+-- FIXED: Removed emojis from the print statement to prevent console errors on older executors
+print("[UniqueLuck] loaded")
